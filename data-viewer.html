@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Viewer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #1e1e2e;
+  color: #cdd6f4;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13.5px;
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+/* Top bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.topbar-title {
+  font-size: 0.75rem;
+  color: #6c7086;
+  letter-spacing: 0.08em;
+  margin-right: auto;
+}
+
+.btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  padding: 6px 16px;
+  border-radius: 5px;
+  border: 1px solid #45475a;
+  cursor: pointer;
+  background: #313244;
+  color: #cdd6f4;
+  transition: all 0.15s;
+}
+.btn:hover { background: #45475a; border-color: #7c6af7; }
+.btn.primary { background: #7c6af7; border-color: #7c6af7; color: #fff; }
+.btn.primary:hover { background: #9580ff; }
+
+/* Code window */
+.window {
+  background: #181825;
+  border-radius: 10px;
+  border: 1px solid #313244;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+
+.win-header {
+  background: #1e1e2e;
+  border-bottom: 1px solid #313244;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.traffic { width: 12px; height: 12px; border-radius: 50%; }
+.t-red    { background: #f38ba8; }
+.t-yellow { background: #f9e2af; }
+.t-green  { background: #a6e3a1; }
+
+.win-filename {
+  font-size: 0.72rem;
+  color: #6c7086;
+  margin-left: 8px;
+  letter-spacing: 0.05em;
+}
+
+.win-actions { margin-left: auto; display: flex; gap: 8px; }
+
+/* Input area */
+.input-wrap { padding: 0; }
+
+textarea {
+  width: 100%;
+  min-height: 160px;
+  background: #11111b;
+  border: none;
+  outline: none;
+  color: #cdd6f4;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  padding: 16px 20px;
+  resize: vertical;
+  border-bottom: 1px solid #313244;
+}
+textarea::placeholder { color: #45475a; }
+
+/* Divider bar */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #1e1e2e;
+  border-bottom: 1px solid #313244;
+}
+.divider span { font-size: 0.65rem; color: #6c7086; letter-spacing: 0.1em; }
+.divider .count { margin-left: auto; font-size: 0.65rem; color: #6c7086; }
+
+/* Code output */
+.code-output {
+  padding: 12px 0 20px;
+  overflow-x: auto;
+}
+
+.code-line {
+  display: flex;
+  align-items: baseline;
+  padding: 0 0 0 0;
+  min-height: 23px;
+}
+.code-line:hover { background: rgba(255,255,255,0.03); }
+
+.ln {
+  min-width: 52px;
+  text-align: right;
+  padding-right: 20px;
+  color: #45475a;
+  user-select: none;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.code-content {
+  flex: 1;
+  padding-right: 24px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* bracket lines */
+.line-bracket { color: #cdd6f4; }
+
+/* indent */
+.indent { display: inline-block; width: 20px; }
+
+/* Syntax colors — matching screenshot */
+.c-key     { color: #89b4fa; }   /* blue  — keys */
+.c-str     { color: #a6e3a1; }   /* green — strings */
+.c-num     { color: #fab387; }   /* peach — numbers */
+.c-kw      { color: #f38ba8; }   /* red   — False/True/None */
+.c-punc    { color: #6c7086; }   /* grey  — colon comma brackets */
+.c-tuple-id  { color: #fab387; } /* peach — tuple id */
+.c-tuple-str { color: #a6e3a1; } /* green — tuple name */
+.c-date    { color: #cba6f7; }   /* mauve — datetime */
+.c-cls     { color: #f9e2af; }   /* yellow — class name */
+.c-markup  { color: #89dceb; }   /* teal  — Markup(...) */
+
+.placeholder {
+  padding: 40px 20px;
+  text-align: center;
+  color: #45475a;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+}
+
+.error-line {
+  padding: 12px 20px;
+  color: #f38ba8;
+  font-size: 0.8rem;
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <span class="topbar-title">PYTHON DATA VIEWER</span>
+    <button class="btn" onclick="loadSample()">Load Sample</button>
+    <button class="btn primary" onclick="renderData()">▶ Render</button>
+    <button class="btn" onclick="clearAll()">Clear</button>
+  </div>
+
+  <div class="window">
+    <div class="win-header">
+      <span class="traffic t-red"></span>
+      <span class="traffic t-yellow"></span>
+      <span class="traffic t-green"></span>
+      <span class="win-filename">input.py</span>
+    </div>
+    <div class="input-wrap">
+      <textarea id="inputArea" placeholder="Paste Python dict or list here..."></textarea>
+    </div>
+
+    <div class="divider">
+      <span>OUTPUT</span>
+      <span class="count" id="lineCount"></span>
+    </div>
+
+    <div class="code-output" id="output">
+      <div class="placeholder">— paste data above and click Render —</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Sample data ───────────────────────────────────────────
+const SAMPLE = `[{'id': 26, 'display_name': 'S00026', 'campaign_id': False, 'source_id': False, 'medium_id': False, 'utm_reference': False, 'access_url': '/my/orders/26', 'access_token': False, 'access_warning': '', 'message_is_follower': False, 'message_follower_ids': [], 'message_partner_ids': [], 'message_ids': [], 'has_message': False, 'message_needaction': False, 'message_needaction_counter': 0, 'message_has_error': False, 'message_has_error_counter': 0, 'message_attachment_count': 0, 'rating_ids': [], 'website_message_ids': [], 'message_has_sms_error': False, 'activity_ids': [], 'activity_state': False, 'activity_user_id': False, 'activity_type_id': False, 'activity_type_icon': False, 'activity_date_deadline': False, 'my_activity_date_deadline': False, 'activity_summary': False, 'activity_exception_decoration': False, 'activity_exception_icon': False, 'activity_plans_ids': [], 'name': 'S00026', 'company_id': (1, 'YourCompany'), 'partner_id': (18, 'Azure Interior'), 'state': 'draft', 'locked': False, 'invoicing_closed': False, 'has_archived_products': False, 'client_order_ref': False, 'create_date': datetime.datetime(2026, 5, 25, 9, 5, 52, 128437), 'commitment_date': False, 'delivery_date': False, 'date_order': datetime.datetime(2026, 5, 25, 8, 54, 4), 'origin': False, 'reference': False, 'pending_email_template_id': False, 'require_signature': True, 'require_payment': True, 'prepayment_percent': 1.0, 'signature': False, 'signed_by': False, 'signed_on': False, 'validity_date': datetime.date(2026, 6, 24), 'journal_id': False, 'note': False, 'partner_invoice_id': (18, 'Azure Interior'), 'partner_shipping_id': (18, 'Azure Interior'), 'fiscal_position_id': (1, 'Domestic'), 'payment_term_id': (6, 'End of Following Month'), 'preferred_payment_method_line_id': False, 'pricelist_id': False, 'currency_id': (1, 'USD'), 'currency_rate': 1.0, 'user_id': (2, 'Mitchell Admin'), 'team_id': (1, 'Sales'), 'incoterm': False, 'incoterm_location': False, 'order_line': [54, 55], 'amount_untaxed': 35.0, 'amount_tax': 5.25, 'amount_total': 40.25, 'amount_to_invoice': 40.25, 'amount_invoiced': 0.0, 'invoice_count': 0, 'invoice_ids': [], 'invoice_status': 'no', 'sale_warning_text': '', 'transaction_count': 0, 'transaction_ids': [], 'authorized_transaction_ids': [], 'has_authorized_transaction_ids': False, 'amount_paid': 0.0, 'tag_ids': [], 'country_code': 'US', 'company_price_include': 'tax_excluded', 'delivery_status': False, 'duplicated_order_ids': [], 'expected_date': False, 'is_expired': False, 'partner_credit_warning': '', 'show_deliver_button': False, 'tax_calculation_rounding_method': 'round_globally', 'tax_country_id': (233, 'United States'), 'tax_totals': {'currency_id': 1, 'currency_pd': 0.01, 'company_currency_id': 1, 'company_currency_pd': 0.01, 'has_tax_groups': True, 'subtotals': [{'tax_groups': [{'id': 1, 'involved_tax_ids': [1], 'tax_amount_currency': 5.25, 'tax_amount': 5.25, 'base_amount_currency': 35.0, 'base_amount': 35.0, 'display_base_amount_currency': 35.0, 'display_base_amount': 35.0, 'group_name': 'Tax 15%', 'group_label': False}], 'tax_amount_currency': 5.25, 'tax_amount': 5.25, 'base_amount_currency': 35.0, 'base_amount': 35.0, 'name': 'Untaxed Amount'}], 'base_amount_currency': 35.0, 'base_amount': 35.0, 'tax_amount_currency': 5.25, 'tax_amount': 5.25, 'same_tax_base': True, 'total_amount_currency': 40.25, 'total_amount': 40.25}, 'terms_type': 'plain', 'type_name': 'Quotation', 'show_update_fpos': False, 'has_active_pricelist': False, 'show_update_pricelist': False, 'analytic_account_id': False, 'create_uid': (2, 'Mitchell Admin'), 'write_uid': (2, 'Mitchell Admin'), 'write_date': datetime.datetime(2026, 5, 25, 9, 5, 52, 128437), 'sale_order_template_id': (2, 'Monthly Cleaning'), 'available_quotation_document_ids': [2], 'is_pdf_quote_builder_available': True, 'quotation_document_ids': [], 'customizable_pdf_form_fields': False, 'rating_last_value': 0.0, 'rating_last_feedback': False, 'rating_last_image': False, 'rating_count': 0, 'rating_avg': 0.0, 'rating_avg_text': 'none', 'rating_percentage_satisfaction': -1.0, 'rating_last_text': False, 'is_subscription': True, 'plan_id': (1, 'Monthly'), 'subscription_state': '1_draft', 'subscription_id': False, 'origin_order_id': False, 'subscription_child_ids': [], 'start_date': datetime.date(2026, 5, 25), 'last_invoice_date': False, 'next_invoice_date': False, 'end_date': datetime.date(2032, 5, 24), 'first_contract_date': datetime.date(2026, 5, 25), 'close_reason_id': False, 'payment_token_id': False, 'is_batch': False, 'is_invoice_cron': False, 'payment_exception': False, 'pending_transaction': False, 'last_reminder_date': False, 'user_pause_start': False, 'is_prorated': True, 'kpi_1month_mrr_delta': 0.0, 'kpi_1month_mrr_percentage': 0.0, 'kpi_3months_mrr_delta': 0.0, 'kpi_3months_mrr_percentage': 0.0, 'team_user_id': (2, 'Mitchell Admin'), 'commercial_partner_id': (18, 'Azure Interior'), 'recurring_total': 10.0, 'recurring_monthly': 10.0, 'non_recurring_total': 25.0, 'order_log_ids': [], 'percentage_satisfaction': -1, 'note_order': (26, 'S00026'), 'internal_note': False, 'internal_note_display': False, 'is_closing': False, 'warn_system_closing': False, 'recurring_details': Markup('<div>MRR: $10.00</div>'), 'is_renewing': False, 'is_upselling': False, 'display_late': False, 'history_count': 0, 'upsell_count': 0, 'renewal_count': 0, 'has_recurring_line': True, 'starred_user_ids': [], 'starred': False, 'user_closable': False, 'user_quantity': False, 'user_extend': False, 'spreadsheet_template_id': False, 'spreadsheet_ids': [], 'spreadsheet_id': False}]`;
+
+function loadSample() { document.getElementById('inputArea').value = SAMPLE; }
+function clearAll() {
+  document.getElementById('inputArea').value = '';
+  document.getElementById('output').innerHTML = '<div class="placeholder">— paste data above and click Render —</div>';
+  document.getElementById('lineCount').textContent = '';
+}
+
+// ── Parser (robust recursive descent) ────────────────────
+function skipWS(ctx) { while (ctx.pos < ctx.src.length && /\s/.test(ctx.src[ctx.pos])) ctx.pos++; }
+
+function parseValue(ctx) {
+  skipWS(ctx);
+  const s = ctx.src, c = s[ctx.pos];
+  if (c === "'" || c === '"') return parseString(ctx);
+  if (c === '[') return parseList(ctx);
+  if (c === '{') return parseDict(ctx);
+  if (c === '(') return parseTuple(ctx);
+  if (s.startsWith('datetime.datetime', ctx.pos)) return parseDatetime(ctx, true);
+  if (s.startsWith('datetime.date', ctx.pos)) return parseDatetime(ctx, false);
+  if (s.startsWith('Markup(', ctx.pos)) return parseMarkup(ctx);
+  if (s.startsWith('<Command.', ctx.pos)) { const e=s.indexOf('>',ctx.pos); ctx.pos=e+1; return {__cmd__:true}; }
+  if (s.startsWith('True', ctx.pos))  { ctx.pos+=4; return true; }
+  if (s.startsWith('False', ctx.pos)) { ctx.pos+=5; return false; }
+  if (s.startsWith('None', ctx.pos))  { ctx.pos+=4; return null; }
+  if (c==='-'||c==='+'||(c>='0'&&c<='9')) return parseNumber(ctx);
+  throw new Error(`Unexpected '${c}' at pos ${ctx.pos} near: ${s.slice(ctx.pos,ctx.pos+30)}`);
+}
+
+function parseString(ctx) {
+  const s=ctx.src, q=s[ctx.pos];
+  const triple=s.startsWith(q+q+q,ctx.pos), delim=triple?q+q+q:q;
+  ctx.pos+=delim.length; let r='';
+  while(ctx.pos<s.length){
+    if(s.startsWith(delim,ctx.pos)){ctx.pos+=delim.length;return r;}
+    if(s[ctx.pos]==='\\'){ctx.pos++;const e=s[ctx.pos++];const m={n:'\n',t:'\t',r:'\r','\\':'\\','\'':'\'','"':'"'};r+=m[e]||e;}
+    else r+=s[ctx.pos++];
+  }
+  throw new Error('Unterminated string');
+}
+
+function parseNumber(ctx) {
+  const s=ctx.src; let i=ctx.pos;
+  if(s[i]==='-'||s[i]==='+')i++;
+  while(i<s.length&&/[0-9]/.test(s[i]))i++;
+  if(i<s.length&&s[i]==='.'){i++;while(i<s.length&&/[0-9]/.test(s[i]))i++;}
+  if(i<s.length&&(s[i]==='e'||s[i]==='E')){i++;if(s[i]==='+'||s[i]==='-')i++;while(i<s.length&&/[0-9]/.test(s[i]))i++;}
+  const n=parseFloat(s.slice(ctx.pos,i)); ctx.pos=i; return n;
+}
+
+function parseList(ctx) {
+  ctx.pos++; const arr=[]; skipWS(ctx);
+  if(ctx.src[ctx.pos]===']'){ctx.pos++;return arr;}
+  while(true){skipWS(ctx);arr.push(parseValue(ctx));skipWS(ctx);
+    if(ctx.src[ctx.pos]===']'){ctx.pos++;break;}
+    if(ctx.src[ctx.pos]===','){ctx.pos++;continue;}
+    throw new Error('Expected , or ] at '+ctx.pos);
+  }
+  return arr;
+}
+
+function parseDict(ctx) {
+  ctx.pos++; const obj={}; skipWS(ctx);
+  if(ctx.src[ctx.pos]==='}'){ctx.pos++;return obj;}
+  while(true){skipWS(ctx);const k=parseValue(ctx);skipWS(ctx);
+    if(ctx.src[ctx.pos]!==':')throw new Error('Expected : at '+ctx.pos);
+    ctx.pos++;skipWS(ctx);const v=parseValue(ctx);obj[String(k)]=v;skipWS(ctx);
+    if(ctx.src[ctx.pos]==='}'){ctx.pos++;break;}
+    if(ctx.src[ctx.pos]===','){ctx.pos++;continue;}
+    throw new Error('Expected , or } at '+ctx.pos);
+  }
+  return obj;
+}
+
+function parseTuple(ctx) {
+  ctx.pos++; const items=[]; skipWS(ctx);
+  if(ctx.src[ctx.pos]===')'){ctx.pos++;return{__tuple__:[]};}
+  while(true){skipWS(ctx);
+    if(ctx.src.startsWith('<Command.',ctx.pos)){const e=ctx.src.indexOf('>',ctx.pos);ctx.pos=e+1;items.push({__cmd__:true});}
+    else items.push(parseValue(ctx));
+    skipWS(ctx);
+    if(ctx.src[ctx.pos]===')'){ctx.pos++;break;}
+    if(ctx.src[ctx.pos]===','){ctx.pos++;continue;}
+    throw new Error('Expected , or ) at '+ctx.pos);
+  }
+  return{__tuple__:items};
+}
+
+function parseDatetime(ctx, withTime) {
+  const prefix=withTime?'datetime.datetime(':'datetime.date(';
+  ctx.pos+=prefix.length; const nums=[]; skipWS(ctx);
+  while(ctx.src[ctx.pos]!==')'){skipWS(ctx);if(ctx.src[ctx.pos]===','){ctx.pos++;continue;}nums.push(parseNumber(ctx));}
+  ctx.pos++;
+  const[Y,Mo=1,D=1,h=0,m=0,sec=0]=nums;
+  const pad=n=>String(Math.floor(n)).padStart(2,'0');
+  return withTime?{__dt__:`${Y}-${pad(Mo)}-${pad(D)} ${pad(h)}:${pad(m)}:${pad(sec)}`}:{__date__:`${Y}-${pad(Mo)}-${pad(D)}`};
+}
+
+function parseMarkup(ctx) {
+  ctx.pos += 7; // skip 'Markup('
+  skipWS(ctx);
+  const inner = parseString(ctx);
+  skipWS(ctx);
+  if(ctx.src[ctx.pos]===')') ctx.pos++;
+  return {__markup__: inner};
+}
+
+// ── Syntax renderer ───────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Render a value inline (single-line representation)
+function renderInline(v) {
+  if (v === null)  return `<span class="c-kw">None</span>`;
+  if (v === false) return `<span class="c-kw">False</span>`;
+  if (v === true)  return `<span class="c-kw">True</span>`;
+  if (typeof v === 'number') return `<span class="c-num">${v}</span>`;
+  if (typeof v === 'string') return `<span class="c-str">'${esc(v)}'</span>`;
+  if (v && v.__dt__)   return `<span class="c-cls">datetime</span><span class="c-punc">.</span><span class="c-cls">datetime</span><span class="c-punc">(</span><span class="c-date">${esc(v.__dt__)}</span><span class="c-punc">)</span>`;
+  if (v && v.__date__) return `<span class="c-cls">datetime</span><span class="c-punc">.</span><span class="c-cls">date</span><span class="c-punc">(</span><span class="c-date">${esc(v.__date__)}</span><span class="c-punc">)</span>`;
+  if (v && v.__markup__) return `<span class="c-cls">Markup</span><span class="c-punc">(</span><span class="c-markup">'${esc(v.__markup__.slice(0,60))}${v.__markup__.length>60?'...':''}'</span><span class="c-punc">)</span>`;
+  if (v && v.__cmd__) return `<span class="c-kw">&lt;Command.SET&gt;</span>`;
+  if (v && '__tuple__' in v) {
+    const parts = v.__tuple__;
+    if (!parts.length) return `<span class="c-punc">()</span>`;
+    const inner = parts.map((p,i)=> i===0
+      ? `<span class="c-tuple-id">${typeof p==='number'?p:`'${esc(String(p))}'`}</span>`
+      : `<span class="c-tuple-str">'${esc(String(p))}'</span>`
+    ).join(`<span class="c-punc">, </span>`);
+    return `<span class="c-punc">(</span>${inner}<span class="c-punc">)</span>`;
+  }
+  if (Array.isArray(v)) {
+    if (!v.length) return `<span class="c-punc">[]</span>`;
+    if (v.length <= 6 && v.every(x => typeof x !== 'object' || x === null)) {
+      const inner = v.map(x => renderInline(x)).join(`<span class="c-punc">, </span>`);
+      return `<span class="c-punc">[</span>${inner}<span class="c-punc">]</span>`;
+    }
+    return `<span class="c-punc">[</span><span class="c-num">${v.length} items</span><span class="c-punc">]</span>`;
+  }
+  if (typeof v === 'object') {
+    const keys = Object.keys(v);
+    if (!keys.length) return `<span class="c-punc">{}</span>`;
+    return `<span class="c-punc">{</span><span class="c-num">${keys.length} keys</span><span class="c-punc">}</span>`;
+  }
+  return `<span>${esc(String(v))}</span>`;
+}
+
+// Render a full object/list as lines, returning array of {indent, html} entries
+function renderLines(val, depth) {
+  const lines = [];
+  const ind = depth;
+
+  if (Array.isArray(val)) {
+    lines.push({ indent: ind, html: `<span class="c-punc">[</span>` });
+    val.forEach((item, i) => {
+      const comma = i < val.length - 1 ? `<span class="c-punc">,</span>` : '';
+      if (item && typeof item === 'object' && !item.__tuple__ && !item.__dt__ && !item.__date__ && !item.__markup__ && !item.__cmd__) {
+        const sub = renderLines(item, depth + 1);
+        sub.forEach((l, li) => {
+          if (li === sub.length - 1) {
+            lines.push({ indent: l.indent, html: l.html + comma });
+          } else {
+            lines.push(l);
+          }
+        });
+      } else {
+        lines.push({ indent: ind + 1, html: renderInline(item) + comma });
+      }
+    });
+    lines.push({ indent: ind, html: `<span class="c-punc">]</span>` });
+
+  } else if (val && typeof val === 'object' && !val.__tuple__ && !val.__dt__ && !val.__date__ && !val.__markup__ && !val.__cmd__) {
+    lines.push({ indent: ind, html: `<span class="c-punc">{</span>` });
+    const entries = Object.entries(val);
+    entries.forEach(([k, v], i) => {
+      const comma = i < entries.length - 1 ? `<span class="c-punc">,</span>` : '';
+      // Check if value needs expansion (nested dict/list with content, not special types)
+      const needsExpand = v && typeof v === 'object' && !v.__tuple__ && !v.__dt__ && !v.__date__ && !v.__markup__ && !v.__cmd__ &&
+        (Array.isArray(v) ? v.length > 0 && v.some(x => x && typeof x === 'object') : Object.keys(v).length > 0);
+
+      if (needsExpand) {
+        lines.push({ indent: ind + 1, html: `<span class="c-key">'${esc(k)}'</span><span class="c-punc">: </span>` });
+        const sub = renderLines(v, depth + 2);
+        sub.forEach((l, li) => {
+          if (li === sub.length - 1) {
+            lines.push({ indent: l.indent, html: l.html + comma });
+          } else {
+            lines.push(l);
+          }
+        });
+      } else {
+        lines.push({ indent: ind + 1, html: `<span class="c-key">'${esc(k)}'</span><span class="c-punc">: </span>${renderInline(v)}${comma}` });
+      }
+    });
+    lines.push({ indent: ind, html: `<span class="c-punc">}</span>` });
+  } else {
+    lines.push({ indent: ind, html: renderInline(val) });
+  }
+  return lines;
+}
+
+// ── Main ──────────────────────────────────────────────────
+function renderData() {
+  const raw = document.getElementById('inputArea').value.trim();
+  if (!raw) return;
+
+  const out = document.getElementById('output');
+  try {
+    const ctx = { pos: 0, src: raw };
+    let parsed = parseValue(ctx);
+
+    const lines = renderLines(parsed, 0);
+    let html = '';
+    lines.forEach((line, i) => {
+      const indentSpaces = '  '.repeat(line.indent);
+      html += `<div class="code-line">
+        <span class="ln">${i + 1}</span>
+        <span class="code-content">${indentSpaces}${line.html}</span>
+      </div>`;
+    });
+
+    out.innerHTML = html;
+    document.getElementById('lineCount').textContent = `${lines.length} lines · ${Object.keys(Array.isArray(parsed)?parsed[0]||{}:parsed).length || '?'} keys`;
+  } catch(e) {
+    out.innerHTML = `<div class="error-line">⚠ Parse error: ${esc(e.message)}</div>`;
+    document.getElementById('lineCount').textContent = '';
+  }
+}
+
+// Auto-parse on paste
+document.getElementById('inputArea').addEventListener('paste', () => setTimeout(renderData, 60));
+
+// Load sample on start
+loadSample();
+setTimeout(renderData, 80);
+</script>
+</body>
+</html>
